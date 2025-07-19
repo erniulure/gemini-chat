@@ -1,0 +1,15 @@
+{
+  "name": "gemini-chat",
+  "version": "1.0.0",
+  "description": "一个基于 Docker 的 Gemini AI 聊天应用，支持流式对话和 Markdown 渲染。",
+  "main": "test-playwright-mcp.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "playwright": "^1.54.1"
+  }
+}

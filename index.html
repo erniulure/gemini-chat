@@ -59,437 +59,110 @@
                 console.error('Marked.js 未正确加载');
             }
 
-            // 自动修复数学公式分隔符的函数 - 基于您的测试用例优化
+            // 增强的数学公式检测和保护
             function fixMathDelimiters(text) {
-                // 如果已经有数学分隔符，直接返回
-                if (text.includes('$') || text.includes('\\[') || text.includes('\\(')) {
-                    return text;
-                }
-
-                // 扩展的LaTeX命令检测 - 基于您提供的测试用例
-                const latexPatterns = [
-                    // 基础结构
-                    /\\frac\{[^}]+\}\{[^}]+\}/g,           // \frac{a}{b}
-                    /\\sqrt(\[[^\]]*\])?\{[^}]+\}/g,       // \sqrt{x}, \sqrt[n]{x}
-
-                    // 积分和求和
-                    /\\int(_\{[^}]*\})?(\^\{[^}]*\})?/g,   // \int, \int_a^b
-                    /\\sum(_\{[^}]*\})?(\^\{[^}]*\})?/g,   // \sum_{i=1}^n
-                    /\\prod(_\{[^}]*\})?(\^\{[^}]*\})?/g,  // \prod
-                    /\\lim(_\{[^}]*\})?/g,                 // \lim_{x \to a}
-
-                    // 希腊字母 - 完整列表
-                    /\\(alpha|beta|gamma|delta|epsilon|zeta|eta|theta|iota|kappa|lambda|mu|nu|xi|omicron|pi|rho|sigma|tau|upsilon|phi|chi|psi|omega)/g,
-                    /\\(Alpha|Beta|Gamma|Delta|Epsilon|Zeta|Eta|Theta|Iota|Kappa|Lambda|Mu|Nu|Xi|Omicron|Pi|Rho|Sigma|Tau|Upsilon|Phi|Chi|Psi|Omega)/g,
-
-                    // 三角函数和对数
-                    /\\(sin|cos|tan|arcsin|arccos|arctan|log|ln)/g,
-
-                    // 逻辑符号
-                    /\\(implies|iff|neg|land|lor|forall|exists)/g,
-
-                    // 关系符号
-                    /\\(neq|geq|leq|approx|pm|infty)/g,
-
-                    // 向量和矩阵
-                    /\\mathbf\{[^}]+\}/g,                  // \mathbf{F}
-                    /\\vec\{[^}]+\}/g,                     // \vec{v}
-                    /\\begin\{[^}]+\}[\s\S]*?\\end\{[^}]+\}/g, // 矩阵等环境
-
-                    // 微分符号
-                    /\\nabla/g,                            // \nabla
-                    /\\partial/g,                          // \partial
-
-                    // 运算符
-                    /\\times/g,                            // \times
-                    /\\cdot/g,                             // \cdot
-
-                    // 上标下标
-                    /[a-zA-Z]_\{[^}]+\}/g,                 // x_{ij}
-                    /[a-zA-Z]\^\{[^}]+\}/g,                // x^{2}
-                    /[a-zA-Z]_[a-zA-Z0-9]/g,               // x_i
-                    /[a-zA-Z]\^[a-zA-Z0-9]/g,              // x^2
-
-                    // 特殊字体
-                    /\\mathbb\{[^}]+\}/g,                  // \mathbb{R}
-                    /\\mathcal\{[^}]+\}/g,                 // \mathcal{L}
-
-                    // 文本模式
-                    /\\text\{[^}]+\}/g                     // \text{文本}
-                ];
-
-                let processedText = text;
-                let hasLatex = false;
-
-                // 检查是否包含LaTeX语法
-                for (let pattern of latexPatterns) {
-                    if (pattern.test(processedText)) {
-                        hasLatex = true;
-                        break;
-                    }
-                }
-
-                if (hasLatex) {
-                    console.log('检测到LaTeX语法，自动添加分隔符...');
-                    // 不再输出具体内容，避免日志过多
-                }
-
-                return processedText;
+                // 直接返回原文本，让 KaTeX 处理数学公式
+                return text;
             }
 
-            // 安全的Markdown解析函数 - 优化LaTeX处理，特别是块级公式
+            // 简化的Markdown解析函数
             window.safeParse = function(text) {
-                console.log('开始解析文本，检查块级公式...');
-
-                // 先修复数学公式分隔符
+                // 简单的数学公式处理
                 let fixedText = fixMathDelimiters(text);
 
-                // 特别处理块级数学公式 - 保护 $$...$$ 不被Markdown处理
-                const mathBlocks = [];
-                let mathBlockIndex = 0;
-
-                // 1. 提取并保护块级数学公式
-                // 使用更强健的正则表达式来匹配块级公式
-                let blockMathRegex = /\$\$((?:[^$]|\$(?!\$))*)\$\$/g;
-                fixedText = fixedText.replace(blockMathRegex, (match, content) => {
-                    const placeholder = `<!--MATH_BLOCK_${mathBlockIndex}-->`;
-                    mathBlocks[mathBlockIndex] = match;
-                    mathBlockIndex++;
-                    console.log(`找到块级公式 ${mathBlockIndex-1}:`, content.substring(0, 100) + (content.length > 100 ? '...' : ''));
-                    console.log('完整公式内容:', match);
-                    return placeholder;
-                });
-
-                // 2. 处理列表项中的代码块（如 * `E=mc²`）
-                fixedText = fixedText.replace(/(\*\s+)`([^`]*)`/g, (match, prefix, content) => {
-                    // 更严格的LaTeX检测：只检测明确的数学符号和常见数学命令
-                    const hasLatex = /\\(frac|sqrt|sum|int|lim|sin|cos|tan|log|ln|exp|alpha|beta|gamma|delta|pi|theta|lambda|mu|sigma|omega|infty|partial|nabla|cdot|times|div|pm|mp|leq|geq|neq|approx|equiv|propto|in|subset|supset|cup|cap|emptyset|mathbb|mathcal|mathrm|text)\b|[_^]\{[^}]+\}|\^[0-9]+|_[0-9]+/.test(content);
-                    if (hasLatex) {
-                        return prefix + '$' + content + '$';
-                    }
-                    return match; // 保持原样
-                });
-
-                // 3. 处理独立行的代码块
-                fixedText = fixedText.replace(/^`([^`]+)`$/gm, (match, content) => {
-                    // 更严格的LaTeX检测
-                    const hasLatex = /\\(frac|sqrt|sum|int|lim|sin|cos|tan|log|ln|exp|alpha|beta|gamma|delta|pi|theta|lambda|mu|sigma|omega|infty|partial|nabla|cdot|times|div|pm|mp|leq|geq|neq|approx|equiv|propto|in|subset|supset|cup|cap|emptyset|mathbb|mathcal|mathrm|text)\b|[_^]\{[^}]+\}|\^[0-9]+|_[0-9]+/.test(content);
-                    if (hasLatex) {
-                        return '$$' + content + '$$'; // 独立行使用显示模式
-                    }
-                    return match;
-                });
-
-                // 4. 处理行内的代码块（但不在列表中）
-                fixedText = fixedText.replace(/(?<![\*\-]\s+)`([^`]*)`/g, (match, content) => {
-                    // 更严格的LaTeX检测
-                    const hasLatex = /\\(frac|sqrt|sum|int|lim|sin|cos|tan|log|ln|exp|alpha|beta|gamma|delta|pi|theta|lambda|mu|sigma|omega|infty|partial|nabla|cdot|times|div|pm|mp|leq|geq|neq|approx|equiv|propto|in|subset|supset|cup|cap|emptyset|mathbb|mathcal|mathrm|text)\b|[_^]\{[^}]+\}|\^[0-9]+|_[0-9]+/.test(content);
-                    if (hasLatex) {
-                        return '$' + content + '$'; // 行内使用行内模式
-                    }
-                    return match;
-                });
-
-                // 5. 先进行Markdown解析
-                let parsedText = marked.parse(fixedText);
-
-                // 6. 恢复块级数学公式
-                for (let i = 0; i < mathBlocks.length; i++) {
-                    const placeholder = `<!--MATH_BLOCK_${i}-->`;
-                    if (parsedText.includes(placeholder)) {
-                        parsedText = parsedText.replace(placeholder, mathBlocks[i]);
-                        console.log(`恢复块级公式 ${i}:`, mathBlocks[i].substring(0, 50) + '...');
-                    } else {
-                        console.warn(`未找到占位符: ${placeholder}`);
-                    }
-                }
-
-                // 7. 处理GitHub风格的提示框
-                parsedText = processGitHubAlerts(parsedText);
-
-                // 8. 处理KaTeX不支持的环境，转换为支持的格式
-                parsedText = convertUnsupportedMathEnvironments(parsedText);
-
-                console.log('解析完成，恢复了', mathBlocks.length, '个块级公式');
-
-                return parsedText;
+                // 直接进行Markdown解析
+                return marked.parse(fixedText);
             };
 
-            // 处理GitHub风格的提示框
-            function processGitHubAlerts(html) {
-                const alertTypes = {
-                    'NOTE': { icon: '📝', class: 'alert-note', color: '#0969da' },
-                    'TIP': { icon: '💡', class: 'alert-tip', color: '#1a7f37' },
-                    'IMPORTANT': { icon: '❗', class: 'alert-important', color: '#8250df' },
-                    'WARNING': { icon: '⚠️', class: 'alert-warning', color: '#d1242f' },
-                    'CAUTION': { icon: '🚨', class: 'alert-caution', color: '#d1242f' }
-                };
 
-                // 匹配GitHub风格的提示框
-                const alertRegex = /<p>\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]<br>\s*([\s\S]*?)<\/p>/gi;
 
-                return html.replace(alertRegex, (match, type, content) => {
-                    const alert = alertTypes[type.toUpperCase()];
-                    if (!alert) return match;
-
-                    return `
-                        <div class="github-alert ${alert.class}">
-                            <div class="alert-header">
-                                <span class="alert-icon">${alert.icon}</span>
-                                <span class="alert-title">${type}</span>
-                            </div>
-                            <div class="alert-content">${content.trim()}</div>
-                        </div>
-                    `;
-                });
+            // 简化的库初始化
+            if (typeof hljs !== 'undefined') {
+                hljs.configure({ ignoreUnescapedHTML: true });
             }
 
-            // 转换KaTeX不支持的数学环境
-            function convertUnsupportedMathEnvironments(html) {
-                console.log('开始转换数学环境，输入HTML长度:', html.length);
-
-                // 更简单直接的方法：查找并替换 align* 环境
-                if (html.includes('\\begin{align*}')) {
-                    console.log('发现 align* 环境，开始转换...');
-                    html = html.replace(/\\begin\{align\*\}/g, '\\begin{aligned}');
-                    html = html.replace(/\\end\{align\*\}/g, '\\end{aligned}');
-                    console.log('align* 环境转换完成');
-                }
-
-                // 转换 align 环境
-                if (html.includes('\\begin{align}')) {
-                    console.log('发现 align 环境，开始转换...');
-                    html = html.replace(/\\begin\{align\}/g, '\\begin{aligned}');
-                    html = html.replace(/\\end\{align\}/g, '\\end{aligned}');
-                    console.log('align 环境转换完成');
-                }
-
-                // 转换 gather* 环境
-                if (html.includes('\\begin{gather*}')) {
-                    console.log('发现 gather* 环境，开始转换...');
-                    html = html.replace(/\\begin\{gather\*\}/g, '\\begin{gathered}');
-                    html = html.replace(/\\end\{gather\*\}/g, '\\end{gathered}');
-                    console.log('gather* 环境转换完成');
-                }
-
-                console.log('数学环境转换完成，输出HTML长度:', html.length);
-                return html;
-            }
-
-            // 检查 Highlight.js
-            if (typeof hljs !== 'undefined' && hljs.highlightAll) {
-                // 配置 highlight.js 忽略 mermaid 代码块
-                hljs.configure({
-                    ignoreUnescapedHTML: true
-                });
-                hljs.highlightAll();
-
-            } else {
-                console.error('Highlight.js 未正确加载');
-                console.log('hljs type:', typeof hljs);
-                console.log('hljs object:', hljs);
-            }
-
-            // 检查 KaTeX
-            if (typeof renderMathInElement !== 'undefined') {
-                console.log('KaTeX 已正确加载');
-                // KaTeX 配置将在 renderMath 函数中处理
-            } else {
-                console.error('KaTeX 未正确加载');
-                console.log('renderMathInElement type:', typeof renderMathInElement);
-                console.log('katex type:', typeof katex);
-            }
-
-            // 检查 Mermaid
             if (typeof mermaid !== 'undefined') {
                 mermaid.initialize({
                     startOnLoad: false,
                     theme: 'default',
                     securityLevel: 'loose'
                 });
-
-            } else {
-                console.error('Mermaid 未正确加载');
             }
-
-            // 启动数学公式自动观察器
-            setupMathObserver();
-
-        // 添加转换测试函数
-        window.testConversion = function() {
-            const testInput = `$$
-\\begin{align*}
-(a+b)^2 &= (a+b)(a+b) \\\\
-&= a^2 + 2ab + b^2
-\\end{align*}
-$$`;
-            console.log('=== 转换测试 ===');
-            console.log('输入:', testInput);
-            const result = convertUnsupportedMathEnvironments(testInput);
-            console.log('输出:', result);
-            return result;
-        };
-
-        // 添加调试函数
-        window.debugMath = function() {
-            console.log('=== 数学公式调试信息 ===');
-            console.log('KaTeX 加载状态:', typeof katex !== 'undefined');
-            console.log('renderMathInElement 加载状态:', typeof renderMathInElement !== 'undefined');
-
-            const messages = document.querySelectorAll('.message-content');
-            messages.forEach((msg, index) => {
-                const content = msg.innerHTML;
-                const hasMath = content.includes('$') || content.includes('\\[') || content.includes('\\(');
-                console.log(`消息 ${index}: 包含数学公式=${hasMath}, 已渲染=${msg.mathRendered}`);
-                if (hasMath) {
-                    console.log('内容预览:', content.substring(0, 100) + '...');
-                }
-            });
-        };
         });
 
-        // 渲染数学公式的函数 - 防止重复渲染
-        let mathRenderingInProgress = false;
-
-        // 禁用自动观察器，改用手动渲染
-        function setupMathObserver() {
-            // 暂时禁用，避免无限循环
-            console.log('数学公式自动观察器已禁用');
-        }
-
+        // 增强的数学公式渲染
         function renderMath(element) {
-            // 防止重复渲染
             if (element.mathRendered) {
                 return;
             }
 
-            if (typeof renderMathInElement !== 'undefined') {
-                // 检查是否包含数学公式
-                const content = element.innerHTML;
-                if (content.includes('$') || content.includes('\\[') || content.includes('\\(')) {
-                    console.log('检测到数学公式，准备渲染...');
+            // 等待 KaTeX 加载完成
+            if (typeof renderMathInElement === 'undefined') {
+                setTimeout(() => renderMath(element), 100);
+                return;
+            }
 
-                    // 标记为已处理，防止重复渲染
-                    element.mathRendered = true;
+            const content = element.innerHTML;
+            // 检测各种数学公式格式
+            if (content.includes('$') || content.includes('\\[') || content.includes('\\(') ||
+                content.includes('\\frac') || content.includes('\\sum') || content.includes('\\int') ||
+                content.includes('\\begin{') || content.includes('\\det') || content.includes('\\prod')) {
 
-                    setTimeout(() => {
-                        try {
-                            renderMathInElement(element, {
-                                delimiters: [
-                                    {left: '$$', right: '$$', display: true},
-                                    {left: '$', right: '$', display: false},
-                                    {left: '\\[', right: '\\]', display: true},
-                                    {left: '\\(', right: '\\)', display: false}
-                                ],
-                                throwOnError: false,
-                                ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre'],
-                                ignoredClasses: ['language-mermaid'],
-                                trust: true,
-                                strict: false,
-                                // 扩展宏定义，支持更多LaTeX命令和环境
-                                macros: {
-                                    // 数学字体
-                                    "\\RR": "\\mathbb{R}",
-                                    "\\NN": "\\mathbb{N}",
-                                    "\\ZZ": "\\mathbb{Z}",
-                                    "\\QQ": "\\mathbb{Q}",
-                                    "\\CC": "\\mathbb{C}",
-                                    "\\FF": "\\mathbb{F}",
-
-                                    // 常用符号简写
-                                    "\\eps": "\\epsilon",
-                                    "\\veps": "\\varepsilon",
-                                    "\\vphi": "\\varphi",
-                                    "\\vtheta": "\\vartheta",
-
-                                    // 运算符
-                                    "\\grad": "\\nabla",
-                                    "\\div": "\\nabla \\cdot",
-                                    "\\curl": "\\nabla \\times",
-
-                                    // 常用函数
-                                    "\\sgn": "\\operatorname{sgn}",
-                                    "\\tr": "\\operatorname{tr}",
-                                    "\\rank": "\\operatorname{rank}"
-                                },
-                                // 启用更多功能，支持复杂环境
-                                fleqn: false,
-                                leqno: false,
-                                minRuleThickness: 0.04,
-                                // 启用更多KaTeX功能
-                                displayMode: false,
-                                output: 'html',
-                                // 支持更多数学环境
-                                globalGroup: true
-                            });
-                            console.log('数学公式渲染完成');
-                        } catch (error) {
-                            console.error('KaTeX 渲染错误:', error);
-                            console.error('错误详情:', error.message);
-                            // 渲染失败时重置标记，允许重试
-                            element.mathRendered = false;
-                        }
-                    }, 100); // 减少延迟，提高响应速度
+                element.mathRendered = true;
+                try {
+                    renderMathInElement(element, {
+                        delimiters: [
+                            {left: '$$', right: '$$', display: true},
+                            {left: '$', right: '$', display: false},
+                            {left: '\\[', right: '\\]', display: true},
+                            {left: '\\(', right: '\\)', display: false}
+                        ],
+                        throwOnError: false,
+                        errorColor: '#cc0000',
+                        macros: {
+                            "\\RR": "\\mathbb{R}",
+                            "\\NN": "\\mathbb{N}",
+                            "\\ZZ": "\\mathbb{Z}",
+                            "\\QQ": "\\mathbb{Q}",
+                            "\\CC": "\\mathbb{C}"
+                        },
+                        trust: true,
+                        strict: false
+                    });
+                    console.log('Math rendered successfully in element');
+                } catch (error) {
+                    console.error('Math rendering error:', error);
+                    element.mathRendered = false;
                 }
             }
         }
 
-        // 渲染Mermaid图表的函数
+        // 简化的Mermaid图表渲染
         function renderMermaid(element) {
-            if (typeof mermaid !== 'undefined') {
-                const mermaidBlocks = element.querySelectorAll('code.language-mermaid');
-                mermaidBlocks.forEach((block, index) => {
-                    const graphDefinition = block.textContent.trim();
-                    const graphId = 'mermaid-' + Date.now() + '-' + index;
+            if (typeof mermaid === 'undefined') return;
 
-                    // 跳过空的或无效的图表定义
-                    if (!graphDefinition || graphDefinition.length < 5) {
-                        return;
-                    }
+            const mermaidBlocks = element.querySelectorAll('code.language-mermaid');
+            mermaidBlocks.forEach((block, index) => {
+                const graphDefinition = block.textContent.trim();
+                if (!graphDefinition) return;
 
-                    // 创建一个div来替换code块
-                    const mermaidDiv = document.createElement('div');
-                    mermaidDiv.id = graphId;
-                    mermaidDiv.className = 'mermaid-diagram';
+                const graphId = 'mermaid-' + Date.now() + '-' + index;
+                const mermaidDiv = document.createElement('div');
+                mermaidDiv.id = graphId;
+                mermaidDiv.className = 'mermaid-diagram';
 
-                    // 替换原来的code块
-                    block.parentNode.replaceChild(mermaidDiv, block);
+                block.parentNode.replaceChild(mermaidDiv, block);
 
-                    // 渲染Mermaid图表
-                    setTimeout(() => {
-                        try {
-                            // 清理和验证图表定义
-                            let cleanDefinition = graphDefinition
-                                .replace(/^\s+/gm, '')  // 移除行首空格
-                                .replace(/\s+$/gm, '')  // 移除行尾空格
-                                .trim();
-
-                            // 验证图表类型
-                            const validTypes = ['graph', 'flowchart', 'sequenceDiagram', 'classDiagram', 'pie', 'gantt', 'gitgraph'];
-                            const isValidType = validTypes.some(type => cleanDefinition.toLowerCase().includes(type.toLowerCase()));
-
-                            if (!isValidType) {
-                                console.warn('未识别的Mermaid图表类型:', cleanDefinition.substring(0, 50));
-                                mermaidDiv.innerHTML = '<pre><code class="language-mermaid">' + graphDefinition + '</code></pre>';
-                                return;
-                            }
-
-                            // 甘特图支持已启用
-
-                            mermaid.render(graphId + '-svg', cleanDefinition).then(({svg}) => {
-                                mermaidDiv.innerHTML = svg;
-                                console.log('Mermaid图表渲染成功');
-                            }).catch(err => {
-                                console.error('Mermaid渲染错误:', err);
-                                mermaidDiv.innerHTML = '<div class="mermaid-error"><strong>图表渲染失败</strong><pre><code>' + graphDefinition + '</code></pre></div>';
-                            });
-                        } catch (err) {
-                            console.error('Mermaid渲染错误:', err);
-                            mermaidDiv.innerHTML = '<div class="mermaid-error"><strong>图表渲染失败</strong><pre><code>' + graphDefinition + '</code></pre></div>';
-                        }
-                    }, 200);
-                });
-            }
+                try {
+                    mermaid.render(graphId + '-svg', graphDefinition).then(({svg}) => {
+                        mermaidDiv.innerHTML = svg;
+                    }).catch(err => {
+                        mermaidDiv.innerHTML = '<pre><code>' + graphDefinition + '</code></pre>';
+                    });
+                } catch (err) {
+                    mermaidDiv.innerHTML = '<pre><code>' + graphDefinition + '</code></pre>';
+                }
+            });
         }
     </script>
     <style>
@@ -1359,7 +1032,7 @@ $$`;
                 <div class="chat-input-wrapper">
                     <div class="image-upload">
                         <input type="file" id="imageInput" accept="image/*">
-                        <button class="image-upload-btn" onclick="document.getElementById('imageInput').click()">
+                        <button class="image-upload-btn" id="imageUploadBtn" type="button">
                             📷
                         </button>
                     </div>
@@ -1369,7 +1042,7 @@ $$`;
                         placeholder="支持 Shift+Enter 换行"
                         rows="1"
                     ></textarea>
-                    <button class="send-button" id="sendButton" onclick="sendMessage()">
+                    <button class="send-button" id="sendButton" type="button">
                         ➤
                     </button>
                 </div>
@@ -1401,150 +1074,139 @@ $$`;
             }
         });
 
-        // 处理图片上传
-        document.getElementById('imageInput').addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    currentImage = e.target.result;
-                    showImagePreview(currentImage);
-                };
-                reader.readAsDataURL(file);
-            }
-        });
-
-        // 处理剪贴板粘贴图片
-        document.addEventListener('paste', function(e) {
-            const items = e.clipboardData.items;
-            for (let i = 0; i < items.length; i++) {
-                if (items[i].type.indexOf('image') !== -1) {
-                    e.preventDefault();
-                    const file = items[i].getAsFile();
-                    const reader = new FileReader();
-                    reader.onload = function(e) {
-                        currentImage = e.target.result;
-                        showImagePreview(currentImage);
-                    };
-                    reader.readAsDataURL(file);
-                    break;
-                }
-            }
-        });
+        // 图片上传相关函数已移至 initializeEventListeners 中
 
         function showImagePreview(imageSrc) {
+            // 移除已存在的预览
+            const existingPreview = document.querySelector('.image-preview-container');
+            if (existingPreview) {
+                existingPreview.remove();
+            }
+
+            // 创建预览容器
+            const previewContainer = document.createElement('div');
+            previewContainer.className = 'image-preview-container';
+            previewContainer.style.cssText = `
+                position: relative;
+                display: inline-block;
+                margin: 10px 0;
+                border-radius: 8px;
+                overflow: hidden;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            `;
+
+            // 创建预览图片
             const preview = document.createElement('img');
             preview.src = imageSrc;
             preview.className = 'image-preview';
-            preview.onclick = () => preview.remove();
+            preview.style.cssText = `
+                max-width: 200px;
+                max-height: 150px;
+                border-radius: 8px;
+                cursor: pointer;
+                display: block;
+            `;
+
+            // 创建删除按钮
+            const removeBtn = document.createElement('button');
+            removeBtn.innerHTML = '×';
+            removeBtn.style.cssText = `
+                position: absolute;
+                top: 5px;
+                right: 5px;
+                width: 24px;
+                height: 24px;
+                border: none;
+                border-radius: 50%;
+                background: rgba(0,0,0,0.7);
+                color: white;
+                cursor: pointer;
+                font-size: 16px;
+                line-height: 1;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            `;
+
+            // 删除事件
+            removeBtn.onclick = (e) => {
+                e.stopPropagation();
+                previewContainer.remove();
+                currentImage = null;
+                document.getElementById('imageInput').value = '';
+            };
+
+            // 点击预览图片可以重新选择
+            preview.onclick = () => {
+                document.getElementById('imageInput').click();
+            };
+
+            previewContainer.appendChild(preview);
+            previewContainer.appendChild(removeBtn);
 
             const inputContainer = document.querySelector('.chat-input-wrapper');
-            inputContainer.insertBefore(preview, inputContainer.firstChild);
+            inputContainer.insertBefore(previewContainer, inputContainer.firstChild);
         }
 
+        // 防抖变量
+        let sendingMessage = false;
+
         async function sendMessage() {
+            // 防止重复发送
+            if (sendingMessage) return;
+
             const input = document.getElementById('chatInput');
+            const sendButton = document.getElementById('sendButton');
             const message = input.value.trim();
 
             if (!message && !currentImage) return;
 
-            // 显示用户消息
-            if (message || currentImage) {
-                addMessage('user', message, currentImage);
-            }
-
-            // 清空输入
-            input.value = '';
-            input.style.height = 'auto';
-
-            // 清除图片预览
-            const preview = document.querySelector('.image-preview');
-            if (preview) preview.remove();
-
-            // 显示正在输入指示器
-            showTypingIndicator();
-
-            // 创建助手消息容器用于流式显示
-            let assistantMessageDiv = null;
-            let assistantContentDiv = null;
+            // 设置发送状态
+            sendingMessage = true;
+            sendButton.disabled = true;
+            sendButton.style.opacity = '0.6';
 
             try {
-                const response = await callGeminiAPI(message, currentImage, (chunk, fullContent) => {
-                    // 流式响应回调
-                    console.log('收到流式数据:', chunk); // 调试信息
-                    if (!assistantMessageDiv) {
-                        hideTypingIndicator();
-                        assistantMessageDiv = createMessageElement('assistant', fullContent || '');
-                        assistantContentDiv = assistantMessageDiv.querySelector('.message-content');
-                        document.getElementById('chatMessages').appendChild(assistantMessageDiv);
-                    }
+                // 显示用户消息
+                if (message || currentImage) {
+                    addMessage('user', message, currentImage);
+                }
 
-                    // 智能决定是否使用动画效果 - 优化判断逻辑
-                    const shouldAnimate = fullContent.length > 30 && fullContent.length < 800 && (
-                        chunk.length > 3 || // 数据块足够大
-                        fullContent.length > 50 // 或者总内容较长但不太长
-                    );
+                // 清空输入
+                input.value = '';
+                input.style.height = 'auto';
 
-                    if (shouldAnimate) {
-                        // 使用动画效果逐步显示
-                        animateTextDisplay(assistantContentDiv, fullContent);
-                    } else {
-                        // 直接显示，适用于很短或很长的回复
-                        assistantContentDiv.innerHTML = safeParse(fullContent);
+                // 清除图片预览
+                const preview = document.querySelector('.image-preview');
+                if (preview) preview.remove();
 
-                        // 高亮代码块（排除mermaid）
-                        assistantContentDiv.querySelectorAll('pre code').forEach((block) => {
-                            if (typeof hljs !== 'undefined' && !block.classList.contains('language-mermaid')) {
-                                hljs.highlightElement(block);
-                            }
-                        });
+                // 显示正在输入指示器
+                showTypingIndicator();
 
-                        // 渲染数学公式和图表
-                        renderMath(assistantContentDiv);
-                        renderMermaid(assistantContentDiv);
-                    }
+                const response = await callGeminiAPI(message, currentImage);
+                hideTypingIndicator();
+                addMessage('assistant', response);
 
-                    // 滚动到底部
-                    const messagesContainer = document.getElementById('chatMessages');
-                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
-                });
+                // 添加到对话历史
+                conversationHistory.push({ role: 'assistant', content: response });
 
-                if (!assistantMessageDiv) {
-                    // 如果没有流式响应，使用传统方式
-                    hideTypingIndicator();
-                    addMessage('assistant', response);
-                } else {
-                    // 添加到对话历史
-                    conversationHistory.push({ role: 'assistant', content: response });
-
-                    // 保存到当前会话
-                    if (currentSessionId && sessions[currentSessionId]) {
-                        sessions[currentSessionId].messages = [...conversationHistory];
-                        sessions[currentSessionId].updatedAt = new Date();
-                        saveToLocalStorage();
-                    }
+                // 保存到当前会话
+                if (currentSessionId && sessions[currentSessionId]) {
+                    sessions[currentSessionId].messages = [...conversationHistory];
+                    sessions[currentSessionId].updatedAt = new Date();
+                    saveToLocalStorage();
                 }
             } catch (error) {
                 hideTypingIndicator();
                 console.error('API调用错误:', error);
-
-                let errorMessage = '抱歉，发生了错误：';
-                if (error.message.includes('Failed to fetch')) {
-                    errorMessage += '网络连接失败，请检查网络连接或稍后重试。';
-                } else if (error.message.includes('401')) {
-                    errorMessage += 'API密钥无效，请检查配置。';
-                } else if (error.message.includes('429')) {
-                    errorMessage += '请求过于频繁，请稍后重试。';
-                } else if (error.message.includes('500')) {
-                    errorMessage += '服务器内部错误，请稍后重试。';
-                } else {
-                    errorMessage += error.message;
-                }
-
-                addMessage('assistant', errorMessage);
+                addMessage('assistant', '抱歉，发生了错误：' + error.message);
+            } finally {
+                // 重置发送状态
+                sendingMessage = false;
+                sendButton.disabled = false;
+                sendButton.style.opacity = '1';
+                currentImage = null;
             }
-
-            currentImage = null;
         }
 
         function createMessageElement(role, content = '') {
@@ -1566,140 +1228,7 @@ $$`;
 
 
 
-        // 逐字显示动画函数 - 优化性能
-        function animateTextDisplay(element, fullText) {
-            // 清除之前的动画
-            if (element.animationTimer) {
-                clearTimeout(element.animationTimer);
-            }
 
-            // 对于很长的文本，直接显示而不使用动画
-            if (fullText.length > 1000) {
-                element.innerHTML = safeParse(fullText);
-                element.querySelectorAll('pre code').forEach((block) => {
-                    if (typeof hljs !== 'undefined' && !block.classList.contains('language-mermaid')) {
-                        hljs.highlightElement(block);
-                    }
-                });
-                renderMath(element);
-                renderMermaid(element);
-                return;
-            }
-
-            const words = fullText.split('');
-            let currentIndex = 0;
-            let displayText = '';
-
-            // 根据文本长度动态调整基础速度
-            const textLength = fullText.length;
-            let baseSpeed;
-
-            if (textLength < 50) {
-                baseSpeed = 30; // 短文本稍慢，让用户能看清
-            } else if (textLength < 200) {
-                baseSpeed = 20; // 中等文本正常速度
-            } else if (textLength < 500) {
-                baseSpeed = 12; // 长文本加快
-            } else {
-                baseSpeed = 6;  // 很长文本很快
-            }
-
-            function showNextChar() {
-                if (currentIndex < words.length) {
-                    displayText += words[currentIndex];
-                    currentIndex++;
-
-
-
-                    // 更智能的markdown解析时机 - 减少解析频率提高性能
-                    const currentChar = words[currentIndex - 1];
-                    const shouldParse = currentIndex === words.length || // 最后一个字符
-                                      currentIndex % 50 === 0 || // 每50个字符（减少频率）
-                                      /[。！？\n]/.test(currentChar); // 句子结束或换行
-
-                    if (shouldParse) {
-                        // 临时处理不完整的markdown标记
-                        let tempText = displayText;
-
-                        // 检查是否有不完整的markdown标记，如果有则暂时不解析
-                        const hasIncompleteMarkdown = /\*[^*]*$|`[^`]*$|#[^#\n]*$/.test(tempText);
-
-                        if (!hasIncompleteMarkdown || currentIndex === words.length) {
-                            element.innerHTML = safeParse(tempText);
-
-                            // 高亮代码块（排除mermaid）
-                            element.querySelectorAll('pre code').forEach((block) => {
-                                if (typeof hljs !== 'undefined' && !block.classList.contains('language-mermaid')) {
-                                    hljs.highlightElement(block);
-                                }
-                            });
-
-                            // 只在最后才渲染数学公式和图表，避免频繁渲染
-                            if (currentIndex === words.length) {
-                                // 重置渲染标记，确保最终渲染
-                                element.mathRendered = false;
-                                renderMath(element);
-                                renderMermaid(element);
-                            }
-                        } else {
-                            // 如果有不完整的markdown，直接显示文本
-                            element.textContent = tempText;
-                        }
-                    }
-
-                    // 根据字符类型和上下文调整速度
-                    const char = words[currentIndex - 1];
-                    const nextChar = words[currentIndex];
-                    let delay = baseSpeed;
-
-                    // 中文字符
-                    if (/[\u4e00-\u9fa5]/.test(char)) {
-                        delay = baseSpeed * 1.2;
-                    }
-                    // 标点符号后稍作停顿
-                    else if (/[。！？；：，]/.test(char)) {
-                        delay = baseSpeed * 2;
-                    }
-                    // 英文标点
-                    else if (/[.!?;:,]/.test(char)) {
-                        delay = baseSpeed * 1.5;
-                    }
-                    // 换行符后停顿
-                    else if (char === '\n') {
-                        delay = baseSpeed * 2.5;
-                    }
-                    // 空格
-                    else if (char === ' ') {
-                        delay = baseSpeed * 0.5;
-                    }
-                    // 数字和英文字母
-                    else if (/[a-zA-Z0-9]/.test(char)) {
-                        delay = baseSpeed * 0.8;
-                    }
-
-                    // 如果接下来是代码块或特殊格式，加快速度
-                    if (displayText.includes('```') && !displayText.endsWith('```')) {
-                        delay = baseSpeed * 0.3; // 代码块内容快速显示
-                    }
-
-                    element.animationTimer = setTimeout(showNextChar, delay);
-                } else {
-                    // 最终完整解析
-                    element.innerHTML = safeParse(fullText);
-                    element.querySelectorAll('pre code').forEach((block) => {
-                        if (typeof hljs !== 'undefined' && !block.classList.contains('language-mermaid')) {
-                            hljs.highlightElement(block);
-                        }
-                    });
-
-                    // 渲染数学公式和图表
-                    renderMath(element);
-                    renderMermaid(element);
-                }
-            }
-
-            showNextChar();
-        }
 
         function addMessage(role, content, image = null) {
             const messagesContainer = document.getElementById('chatMessages');
@@ -1719,53 +1248,43 @@ $$`;
 
             if (content) {
                 if (role === 'assistant') {
-                    // 对助手消息使用 Markdown 解析
                     messageContent.innerHTML = safeParse(content);
 
-                    // 高亮代码块（排除mermaid）
-                    messageContent.querySelectorAll('pre code').forEach((block) => {
-                        if (typeof hljs !== 'undefined' && !block.classList.contains('language-mermaid')) {
-                            hljs.highlightElement(block);
-                        }
-                    });
+                    // 简化的代码高亮
+                    if (typeof hljs !== 'undefined') {
+                        messageContent.querySelectorAll('pre code').forEach(block => {
+                            if (!block.classList.contains('language-mermaid')) {
+                                hljs.highlightElement(block);
+                            }
+                        });
+                    }
 
                     // 渲染数学公式和图表
                     renderMath(messageContent);
                     renderMermaid(messageContent);
                 } else {
-                    // 用户消息保持简单格式
-                    const textDiv = document.createElement('div');
-                    textDiv.innerHTML = content.replace(/\n/g, '<br>');
-                    messageContent.appendChild(textDiv);
+                    messageContent.innerHTML = content.replace(/\n/g, '<br>');
                 }
             }
 
             messagesContainer.appendChild(messageDiv);
-
-            // 滚动到底部
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
 
             // 添加到对话历史
-            if (role === 'user') {
-                const userMessage = { role: 'user', content: content };
-                if (image) {
-                    userMessage.content = [
-                        { type: 'text', text: content || '请分析这张图片' },
-                        { type: 'image_url', image_url: { url: image } }
-                    ];
-                }
-                conversationHistory.push(userMessage);
+            const message = { role, content };
+            if (image && role === 'user') {
+                message.content = [
+                    { type: 'text', text: content || '请分析这张图片' },
+                    { type: 'image_url', image_url: { url: image } }
+                ];
+            }
+            conversationHistory.push(message);
 
-                // 如果是第一条用户消息，更新会话标题
-                if (currentSessionId && sessions[currentSessionId] && sessions[currentSessionId].messages.length === 0) {
+            // 更新会话
+            if (currentSessionId && sessions[currentSessionId]) {
+                if (role === 'user' && sessions[currentSessionId].messages.length === 0) {
                     updateSessionTitle(currentSessionId, content || '图片分析');
                 }
-            } else {
-                conversationHistory.push({ role: 'assistant', content: content });
-            }
-
-            // 保存到当前会话和本地存储
-            if (currentSessionId && sessions[currentSessionId]) {
                 sessions[currentSessionId].messages = [...conversationHistory];
                 sessions[currentSessionId].updatedAt = new Date();
                 saveToLocalStorage();
@@ -1786,9 +1305,8 @@ $$`;
             document.getElementById('sendButton').disabled = false;
         }
 
-        async function callGeminiAPI(message, image = null, onChunk = null) {
+        async function callGeminiAPI(message, image = null) {
             const model = document.getElementById('modelSelect').value;
-
             const messages = [...conversationHistory];
 
             // 构建当前消息
@@ -1804,9 +1322,8 @@ $$`;
             const requestBody = {
                 model: model,
                 messages: messages,
-                max_tokens: 8000, // 增加到8000，支持更长的回复
-                temperature: 0.7,
-                stream: !!onChunk
+                max_tokens: 8000,
+                temperature: 0.7
             };
 
             const response = await fetch(`${API_BASE_URL}/chat/completions`, {
@@ -1822,52 +1339,9 @@ $$`;
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
 
-            if (onChunk) {
-                // 流式响应处理
-                console.log('开始流式响应处理'); // 调试信息
-                const reader = response.body.getReader();
-                const decoder = new TextDecoder();
-                let buffer = '';
-                let fullContent = '';
-
-                try {
-                    while (true) {
-                        const { done, value } = await reader.read();
-                        if (done) break;
-
-                        buffer += decoder.decode(value, { stream: true });
-                        const lines = buffer.split('\n');
-                        buffer = lines.pop(); // 保留不完整的行
-
-                        for (const line of lines) {
-                            if (line.startsWith('data: ')) {
-                                const data = line.slice(6);
-                                if (data === '[DONE]') continue;
-
-                                try {
-                                    const parsed = JSON.parse(data);
-                                    const content = parsed.choices?.[0]?.delta?.content;
-                                    if (content) {
-                                        fullContent += content;
-                                        onChunk(content, fullContent);
-                                    }
-                                } catch (e) {
-                                    console.log('解析错误:', e, '数据:', data); // 调试信息
-                                }
-                            }
-                        }
-                    }
-                } finally {
-                    reader.releaseLock();
-                }
-
-                console.log('流式响应完成，总内容长度:', fullContent.length); // 调试信息
-                return fullContent;
-            } else {
-                // 非流式响应
-                const data = await response.json();
-                return data.choices[0].message.content;
-            }
+            // TODO: 在这里重新实现 API 响应处理逻辑
+            const data = await response.json();
+            return data.choices[0].message.content;
         }
 
         // 会话管理功能
@@ -1992,13 +1466,7 @@ $$`;
                     <div class="message assistant">
                         <div class="message-avatar">G</div>
                         <div class="message-content">
-                            👋 你好！我是 Gemini，您的智能助手。我可以帮您：<br>
-                            • 💬 回答问题和进行对话<br>
-                            • 🖼️ 分析图片内容<br>
-                            • ✍️ 协助写作和创作<br>
-                            • 🔍 提供信息和解释<br>
-                            • 💡 解决问题和提供建议<br><br>
-                            有什么我可以帮助您的吗？
+                            👋 你好！我是 Gemini，您的智能助手。有什么我可以帮助您的吗？
                         </div>
                     </div>
                 `;
@@ -2018,7 +1486,6 @@ $$`;
                     messageContent.className = 'message-content';
 
                     if (Array.isArray(msg.content)) {
-                        // 处理多模态消息
                         msg.content.forEach(item => {
                             if (item.type === 'text') {
                                 const textDiv = document.createElement('div');
@@ -2038,18 +1505,16 @@ $$`;
                     } else {
                         if (msg.role === 'assistant') {
                             messageContent.innerHTML = safeParse(msg.content);
-                            messageContent.querySelectorAll('pre code').forEach((block) => {
-                                if (typeof hljs !== 'undefined' && !block.classList.contains('language-mermaid')) {
-                                    hljs.highlightElement(block);
-                                }
-                            });
-
-                            // 确保数学公式渲染
-                            setTimeout(() => {
-                                messageContent.mathRendered = false; // 重置标记
-                                renderMath(messageContent);
-                                renderMermaid(messageContent);
-                            }, 100);
+                            if (typeof hljs !== 'undefined') {
+                                messageContent.querySelectorAll('pre code').forEach(block => {
+                                    if (!block.classList.contains('language-mermaid')) {
+                                        hljs.highlightElement(block);
+                                    }
+                                });
+                            }
+                            messageContent.mathRendered = false;
+                            renderMath(messageContent);
+                            renderMermaid(messageContent);
                         } else {
                             messageContent.innerHTML = msg.content.replace(/\n/g, '<br>');
                         }
@@ -2128,6 +1593,9 @@ $$`;
                 document.querySelector('.chat-container').classList.add('sidebar-hidden');
             }
 
+            // 初始化事件监听器
+            initializeEventListeners();
+
             // 延迟聚焦，避免移动端键盘弹出问题
             setTimeout(() => {
                 if (!isMobile()) {
@@ -2138,6 +1606,99 @@ $$`;
             // 修复移动端视口高度问题
             fixMobileViewport();
         });
+
+        // 初始化事件监听器
+        function initializeEventListeners() {
+            const sendButton = document.getElementById('sendButton');
+            const chatInput = document.getElementById('chatInput');
+            const imageUploadBtn = document.getElementById('imageUploadBtn');
+            const imageInput = document.getElementById('imageInput');
+
+            // 发送按钮点击事件
+            sendButton.addEventListener('click', (e) => {
+                e.preventDefault();
+                sendMessage();
+            });
+
+            // 图片上传按钮点击事件
+            imageUploadBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                imageInput.click();
+            });
+
+            // 输入框键盘事件
+            chatInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
+                } else if (e.key === 'Enter' && e.shiftKey) {
+                    // 允许 Shift+Enter 换行
+                    return;
+                }
+            });
+
+            // 输入框自动调整高度
+            chatInput.addEventListener('input', () => {
+                chatInput.style.height = 'auto';
+                chatInput.style.height = Math.min(chatInput.scrollHeight, 120) + 'px';
+            });
+
+            // 图片上传处理
+            imageInput.addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    // 验证文件类型
+                    if (!file.type.startsWith('image/')) {
+                        alert('请选择图片文件！');
+                        return;
+                    }
+
+                    // 验证文件大小 (10MB)
+                    if (file.size > 10 * 1024 * 1024) {
+                        alert('图片文件不能超过 10MB！');
+                        return;
+                    }
+
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        currentImage = e.target.result;
+                        showImagePreview(currentImage);
+                    };
+                    reader.onerror = function() {
+                        alert('图片读取失败，请重试！');
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+
+            // 处理剪贴板粘贴图片
+            document.addEventListener('paste', function(e) {
+                const items = e.clipboardData.items;
+                for (let i = 0; i < items.length; i++) {
+                    if (items[i].type.indexOf('image') !== -1) {
+                        e.preventDefault();
+                        const file = items[i].getAsFile();
+
+                        // 验证文件大小
+                        if (file.size > 10 * 1024 * 1024) {
+                            alert('图片文件不能超过 10MB！');
+                            return;
+                        }
+
+                        const reader = new FileReader();
+                        reader.onload = function(e) {
+                            currentImage = e.target.result;
+                            showImagePreview(currentImage);
+                        };
+                        reader.onerror = function() {
+                            alert('图片读取失败，请重试！');
+                        };
+                        reader.readAsDataURL(file);
+                        break;
+                    }
+                }
+            });
+        }
 
         // 修复移动端视口高度问题
         function fixMobileViewport() {
