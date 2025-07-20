@@ -1465,23 +1465,31 @@
 
             // 创建一个临时的消息元素用于实时显示
             const messageElement = createStreamingMessage();
+            console.log('开始流式处理...');
 
             try {
                 while (true) {
                     const { done, value } = await reader.read();
 
-                    if (done) break;
+                    if (done) {
+                        console.log('流式读取完成');
+                        break;
+                    }
 
                     const chunk = decoder.decode(value);
+                    console.log('收到chunk:', chunk);
                     const lines = chunk.split('\n');
 
                     for (const line of lines) {
                         if (line.startsWith('data: ')) {
-                            const data = line.slice(6);
+                            const data = line.slice(6).trim();
 
                             if (data === '[DONE]') {
+                                console.log('收到结束标记');
                                 break;
                             }
+
+                            if (data === '') continue; // 跳过空行
 
                             try {
                                 const parsed = JSON.parse(data);
@@ -1489,17 +1497,20 @@
 
                                 if (delta) {
                                     assistantMessage += delta;
+                                    console.log('更新内容:', delta);
                                     updateStreamingMessage(messageElement, assistantMessage);
+
+                                    // 添加小延迟以显示流式效果
+                                    await new Promise(resolve => setTimeout(resolve, 50));
                                 }
                             } catch (e) {
-                                // 忽略解析错误
-                                console.log('Parse error:', e);
+                                console.log('JSON解析错误:', e, '数据:', data);
                             }
                         }
                     }
                 }
             } catch (error) {
-                console.error('Stream reading error:', error);
+                console.error('流式读取错误:', error);
                 throw error;
             } finally {
                 reader.releaseLock();
@@ -1510,6 +1521,7 @@
 
                 // 完成消息显示
                 finalizeStreamingMessage(messageElement, assistantMessage);
+                console.log('流式处理完成，最终内容长度:', assistantMessage.length);
             }
 
             return assistantMessage;
