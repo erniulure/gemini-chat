@@ -1496,12 +1496,17 @@
                                 const delta = parsed.choices?.[0]?.delta?.content;
 
                                 if (delta) {
-                                    assistantMessage += delta;
-                                    console.log('更新内容:', delta);
-                                    updateStreamingMessage(messageElement, assistantMessage);
+                                    console.log('收到delta:', delta);
 
-                                    // 添加小延迟以显示流式效果
-                                    await new Promise(resolve => setTimeout(resolve, 50));
+                                    // 将大的delta分解为更小的部分以实现真正的打字机效果
+                                    const chars = delta.split('');
+                                    for (const char of chars) {
+                                        assistantMessage += char;
+                                        updateStreamingMessage(messageElement, assistantMessage);
+
+                                        // 每个字符之间的延迟
+                                        await new Promise(resolve => setTimeout(resolve, 50));
+                                    }
                                 }
                             } catch (e) {
                                 console.log('JSON解析错误:', e, '数据:', data);
