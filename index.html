@@ -1457,6 +1457,52 @@
             return assistantMessage;
         }
 
+        // 智能打字速度计算函数
+        function calculateTypingSpeed(content) {
+            const contentLength = content.length;
+
+            // 检测中文字符比例（中文字符通常需要更多时间阅读）
+            const chineseCharCount = (content.match(/[\u4e00-\u9fff]/g) || []).length;
+            const chineseRatio = chineseCharCount / contentLength;
+
+            // 基础速度计算
+            let baseSpeed;
+            if (contentLength <= 10) {
+                // 超短文本：慢速打字，充分展示效果
+                baseSpeed = 150;
+            } else if (contentLength <= 30) {
+                // 短文本：较慢速度，让用户感受打字效果
+                baseSpeed = 100;
+            } else if (contentLength <= 80) {
+                // 中短文本：中等速度
+                baseSpeed = 70;
+            } else if (contentLength <= 150) {
+                // 中等文本：适中速度
+                baseSpeed = 50;
+            } else if (contentLength <= 300) {
+                // 长文本：较快速度，避免等待过久
+                baseSpeed = 30;
+            } else if (contentLength <= 600) {
+                // 很长文本：快速显示
+                baseSpeed = 20;
+            } else if (contentLength <= 1200) {
+                // 超长文本：更快速度
+                baseSpeed = 12;
+            } else {
+                // 极长文本：极快速度，快速完成
+                baseSpeed = 6;
+            }
+
+            // 根据中文比例调整速度（中文内容稍微慢一点，便于阅读）
+            if (chineseRatio > 0.7) {
+                baseSpeed = Math.round(baseSpeed * 1.2); // 中文为主，稍微慢20%
+            } else if (chineseRatio > 0.3) {
+                baseSpeed = Math.round(baseSpeed * 1.1); // 中英混合，稍微慢10%
+            }
+
+            return Math.max(baseSpeed, 5); // 最快不超过5ms
+        }
+
         // 流式响应处理函数
         async function handleStreamResponse(response, currentMessage) {
             const reader = response.body.getReader();
@@ -1498,14 +1544,29 @@
                                 if (delta) {
                                     console.log('收到delta:', delta);
 
+                                    // 智能计算打字速度：根据内容特征动态调整
+                                    const typingSpeed = calculateTypingSpeed(delta);
+                                    const chineseCount = (delta.match(/[\u4e00-\u9fff]/g) || []).length;
+                                    console.log(`内容: "${delta.substring(0, 20)}${delta.length > 20 ? '...' : ''}", 长度: ${delta.length}, 中文: ${chineseCount}, 速度: ${typingSpeed}ms`);
+
                                     // 将大的delta分解为更小的部分以实现真正的打字机效果
                                     const chars = delta.split('');
-                                    for (const char of chars) {
+                                    for (let i = 0; i < chars.length; i++) {
+                                        const char = chars[i];
                                         assistantMessage += char;
                                         updateStreamingMessage(messageElement, assistantMessage);
 
-                                        // 每个字符之间的延迟
-                                        await new Promise(resolve => setTimeout(resolve, 50));
+                                        // 根据字符类型微调延迟（标点符号稍快，中文字符稍慢）
+                                        let charDelay = typingSpeed;
+                                        if (/[，。！？；：、]/.test(char)) {
+                                            charDelay = Math.round(typingSpeed * 0.7); // 中文标点快30%
+                                        } else if (/[,.!?;:]/.test(char)) {
+                                            charDelay = Math.round(typingSpeed * 0.8); // 英文标点快20%
+                                        } else if (/[\u4e00-\u9fff]/.test(char)) {
+                                            charDelay = Math.round(typingSpeed * 1.1); // 中文字符慢10%
+                                        }
+
+                                        await new Promise(resolve => setTimeout(resolve, charDelay));
                                     }
                                 }
                             } catch (e) {
