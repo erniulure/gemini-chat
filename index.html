@@ -363,6 +363,84 @@
             color: white;
         }
 
+        /* 流式输出开关样式 */
+        .stream-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-left: 20px;
+        }
+
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 24px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(255,255,255,0.3);
+            transition: .4s;
+            border-radius: 24px;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .toggle-slider {
+            background-color: #4285f4;
+        }
+
+        input:checked + .toggle-slider:before {
+            transform: translateX(20px);
+        }
+
+        .toggle-label {
+            font-size: 12px;
+            opacity: 0.9;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        /* 流式输出样式 */
+        .message.streaming {
+            opacity: 1;
+        }
+
+        .streaming-cursor {
+            display: inline-block;
+            background-color: #4285f4;
+            color: #4285f4;
+            animation: blink 1s infinite;
+            margin-left: 2px;
+        }
+
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+
         .sidebar-toggle {
             background: rgba(255,255,255,0.2);
             border: 1px solid rgba(255,255,255,0.3);
@@ -700,6 +778,12 @@
                 max-width: 200px;
             }
 
+            .stream-toggle {
+                margin-left: 0;
+                margin-top: 10px;
+                justify-content: center;
+            }
+
             .message {
                 gap: 8px; /* 移动端间距 */
                 margin-bottom: 12px; /* 消息间距 */
@@ -1002,6 +1086,13 @@
                         <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
                     </select>
                 </div>
+                <div class="stream-toggle">
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="streamToggle" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <label for="streamToggle" class="toggle-label">🌊 流式输出</label>
+                </div>
             </div>
 
             <div class="chat-messages" id="chatMessages">
@@ -1180,15 +1271,22 @@
                 const preview = document.querySelector('.image-preview');
                 if (preview) preview.remove();
 
-                // 显示正在输入指示器
-                showTypingIndicator();
+                // 检查是否启用流式输出
+                const streamEnabled = document.getElementById('streamToggle').checked;
+
+                if (!streamEnabled) {
+                    // 非流式输出：显示正在输入指示器
+                    showTypingIndicator();
+                }
 
                 const response = await callGeminiAPI(message, currentImage);
-                hideTypingIndicator();
-                addMessage('assistant', response);
 
-                // 添加到对话历史
-                conversationHistory.push({ role: 'assistant', content: response });
+                if (!streamEnabled) {
+                    // 非流式输出：隐藏指示器并添加消息
+                    hideTypingIndicator();
+                    addMessage('assistant', response);
+                }
+                // 流式输出的消息已在handleStreamResponse中处理
 
                 // 保存到当前会话
                 if (currentSessionId && sessions[currentSessionId]) {
@@ -1307,6 +1405,7 @@
 
         async function callGeminiAPI(message, image = null) {
             const model = document.getElementById('modelSelect').value;
+            const streamEnabled = document.getElementById('streamToggle').checked;
             const messages = [...conversationHistory];
 
             // 构建当前消息
@@ -1323,7 +1422,8 @@
                 model: model,
                 messages: messages,
                 max_tokens: 8000,
-                temperature: 0.7
+                temperature: 0.7,
+                stream: streamEnabled
             };
 
             const response = await fetch(`${API_BASE_URL}/chat/completions`, {
@@ -1339,9 +1439,139 @@
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
 
-            // TODO: 在这里重新实现 API 响应处理逻辑
-            const data = await response.json();
-            return data.choices[0].message.content;
+            let assistantMessage = '';
+
+            if (streamEnabled) {
+                // 流式处理
+                assistantMessage = await handleStreamResponse(response, currentMessage);
+            } else {
+                // 非流式处理
+                const data = await response.json();
+                assistantMessage = data.choices[0].message.content;
+
+                // 更新对话历史
+                conversationHistory.push(currentMessage);
+                conversationHistory.push({ role: 'assistant', content: assistantMessage });
+            }
+
+            return assistantMessage;
+        }
+
+        // 流式响应处理函数
+        async function handleStreamResponse(response, currentMessage) {
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let assistantMessage = '';
+
+            // 创建一个临时的消息元素用于实时显示
+            const messageElement = createStreamingMessage();
+
+            try {
+                while (true) {
+                    const { done, value } = await reader.read();
+
+                    if (done) break;
+
+                    const chunk = decoder.decode(value);
+                    const lines = chunk.split('\n');
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const data = line.slice(6);
+
+                            if (data === '[DONE]') {
+                                break;
+                            }
+
+                            try {
+                                const parsed = JSON.parse(data);
+                                const delta = parsed.choices?.[0]?.delta?.content;
+
+                                if (delta) {
+                                    assistantMessage += delta;
+                                    updateStreamingMessage(messageElement, assistantMessage);
+                                }
+                            } catch (e) {
+                                // 忽略解析错误
+                                console.log('Parse error:', e);
+                            }
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Stream reading error:', error);
+                throw error;
+            } finally {
+                reader.releaseLock();
+
+                // 完成流式输出后，更新对话历史
+                conversationHistory.push(currentMessage);
+                conversationHistory.push({ role: 'assistant', content: assistantMessage });
+
+                // 完成消息显示
+                finalizeStreamingMessage(messageElement, assistantMessage);
+            }
+
+            return assistantMessage;
+        }
+
+        // 创建流式消息元素
+        function createStreamingMessage() {
+            const messagesContainer = document.getElementById('chatMessages');
+
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message assistant streaming';
+
+            const avatar = document.createElement('div');
+            avatar.className = 'message-avatar';
+            avatar.textContent = 'G';
+
+            const content = document.createElement('div');
+            content.className = 'message-content';
+            content.innerHTML = '<span class="streaming-cursor">▋</span>';
+
+            messageDiv.appendChild(avatar);
+            messageDiv.appendChild(content);
+            messagesContainer.appendChild(messageDiv);
+
+            // 滚动到底部
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+            return messageDiv;
+        }
+
+        // 格式化消息内容（用于流式输出）
+        function formatMessage(content) {
+            // 使用与assistant消息相同的格式化逻辑
+            return safeParse(content);
+        }
+
+        // 更新流式消息内容
+        function updateStreamingMessage(messageElement, content) {
+            const contentDiv = messageElement.querySelector('.message-content');
+            contentDiv.innerHTML = formatMessage(content) + '<span class="streaming-cursor">▋</span>';
+
+            // 滚动到底部
+            const messagesContainer = document.getElementById('chatMessages');
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        // 完成流式消息显示
+        function finalizeStreamingMessage(messageElement, content) {
+            const contentDiv = messageElement.querySelector('.message-content');
+            contentDiv.innerHTML = formatMessage(content);
+            messageElement.classList.remove('streaming');
+
+            // 应用代码高亮和数学公式渲染
+            if (typeof hljs !== 'undefined') {
+                contentDiv.querySelectorAll('pre code').forEach(block => {
+                    if (!block.classList.contains('language-mermaid')) {
+                        hljs.highlightElement(block);
+                    }
+                });
+            }
+            renderMath(contentDiv);
+            renderMermaid(contentDiv);
         }
 
         // 会话管理功能
