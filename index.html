@@ -364,7 +364,7 @@
         }
 
         /* 流式输出开关样式 */
-        .stream-toggle {
+        .stream-toggle, .search-toggle {
             display: flex;
             align-items: center;
             gap: 8px;
@@ -778,7 +778,7 @@
                 max-width: 200px;
             }
 
-            .stream-toggle {
+            .stream-toggle, .search-toggle {
                 margin-left: 0;
                 margin-top: 10px;
                 justify-content: center;
@@ -1093,6 +1093,13 @@
                     </label>
                     <label for="streamToggle" class="toggle-label">🌊 流式输出</label>
                 </div>
+                <div class="search-toggle">
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="searchToggle" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <label for="searchToggle" class="toggle-label">🔍 智能搜索</label>
+                </div>
             </div>
 
             <div class="chat-messages" id="chatMessages">
@@ -1144,6 +1151,24 @@
     <script>
         const API_BASE_URL = 'http://47.245.60.206:8000/v1';
         const API_KEY = 'q1q2q3q4';
+
+        // 搜索功能配置
+        const SEARCH_CONFIG = {
+            searchEnabled: true,
+            maxResults: 5,
+            // Gemini官方工具配置
+            geminiTools: {
+                googleSearch: {
+                    enabled: true,
+                    supportedModels: ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash']
+                },
+                urlContext: {
+                    enabled: true,
+                    maxUrls: 20,
+                    supportedModels: ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash']
+                }
+            }
+        };
 
         let currentImage = null;
         let conversationHistory = [];
@@ -1426,6 +1451,42 @@
                 stream: streamEnabled
             };
 
+            // 添加Gemini官方工具支持
+            const tools = [];
+            const needsSearch = shouldSearch(message);
+            const needsUrlContext = shouldUseUrlContext(message);
+
+            // 检查模型是否支持工具和用户是否启用搜索
+            const supportsTools = SEARCH_CONFIG.geminiTools.googleSearch.supportedModels.includes(model);
+            const searchEnabled = document.getElementById('searchToggle').checked;
+
+            if (supportsTools && searchEnabled) {
+                // 添加Google搜索工具
+                if (needsSearch && SEARCH_CONFIG.geminiTools.googleSearch.enabled) {
+                    tools.push({ google_search: {} });
+                    console.log('添加Google搜索工具');
+                }
+
+                // 添加URL上下文工具
+                if (needsUrlContext && SEARCH_CONFIG.geminiTools.urlContext.enabled) {
+                    const urls = extractUrls(message);
+                    if (urls.length > 0) {
+                        tools.push({
+                            url_context: {
+                                urls: urls.slice(0, SEARCH_CONFIG.geminiTools.urlContext.maxUrls)
+                            }
+                        });
+                        console.log('添加URL上下文工具，URLs:', urls);
+                    }
+                }
+            }
+
+            // 如果有工具，添加到请求体
+            if (tools.length > 0) {
+                requestBody.tools = tools;
+                console.log('使用工具:', tools);
+            }
+
             const response = await fetch(`${API_BASE_URL}/chat/completions`, {
                 method: 'POST',
                 headers: {
@@ -1650,6 +1711,33 @@
             }
             renderMath(contentDiv);
             renderMermaid(contentDiv);
+        }
+
+        // 搜索功能实现
+        function shouldSearch(message) {
+            const searchKeywords = [
+                '搜索', '查找', '查询', '最新', '今天', '现在', '当前', '实时',
+                'search', 'find', 'latest', 'current', 'today', 'now',
+                '天气', '新闻', '股价', '汇率', '时间', '日期', '什么时候', '几点'
+            ];
+            return searchKeywords.some(keyword =>
+                message.toLowerCase().includes(keyword.toLowerCase())
+            );
+        }
+
+        function shouldUseUrlContext(message) {
+            const urlPattern = /https?:\/\/[^\s]+/g;
+            const urlKeywords = ['分析', '网页', '链接', '网站', 'analyze', 'website', 'link'];
+
+            return urlPattern.test(message) ||
+                   urlKeywords.some(keyword =>
+                       message.toLowerCase().includes(keyword.toLowerCase())
+                   );
+        }
+
+        function extractUrls(message) {
+            const urlPattern = /https?:\/\/[^\s]+/g;
+            return message.match(urlPattern) || [];
         }
 
         // 会话管理功能
